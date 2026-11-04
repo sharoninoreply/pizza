@@ -1,0 +1,18 @@
+{
+  "name": "pizzeria",
+  "version": "1.0.0",
+  "description": "ניהול הפיצרייה: לקוחות, תפריט, הזמנות ודוחות",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}

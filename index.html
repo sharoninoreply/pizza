@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ניהול הפיצרייה</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Suez+One&family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky header with tabs over a single working column; orders open as a kitchen board (new → oven → out), everything else as list + detail. */
+:root{
+  --bg:#F3F5F2; --surface:#FFFFFF; --sunk:#E9EDE8; --ink:#1B211D; --muted:#5C685F; --line:#D8DFD8;
+  --tomato:#C2381F; --tomato-soft:#FAE3DD; --basil:#2C6B43; --basil-soft:#DFEFE4;
+  --amber:#9A6200; --amber-soft:#FBEDD2; --blue:#285A97; --blue-soft:#E1EAF6;
+  --display:"Suez One", "Frank Ruhl Libre", Georgia, serif;
+  --body:"IBM Plex Sans Hebrew", "Assistant", "Segoe UI", Arial, sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121613; --surface:#1A1F1B; --sunk:#232A25; --ink:#E8EDE9; --muted:#97A39A; --line:#2D3530;
+  --tomato:#FF6B4E; --tomato-soft:#3B1E17; --basil:#6CC28A; --basil-soft:#1B3123;
+  --amber:#E6A83A; --amber-soft:#37290F; --blue:#82B0EC; --blue-soft:#1B283A; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#121613; --surface:#1A1F1B; --sunk:#232A25; --ink:#E8EDE9; --muted:#97A39A; --line:#2D3530;
+  --tomato:#FF6B4E; --tomato-soft:#3B1E17; --basil:#6CC28A; --basil-soft:#1B3123;
+  --amber:#E6A83A; --amber-soft:#37290F; --blue:#82B0EC; --blue-soft:#1B283A; color-scheme:dark }
+
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+[hidden]{display:none!important}
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login form{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px;display:grid;gap:14px;width:min(360px,100%)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1200px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--tomato);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.hbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-block:12px}
+.brand{font-family:var(--display);font-size:24px;line-height:1;display:flex;align-items:center;gap:10px;margin:0}
+.brand svg{flex:none}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-inline-start:auto}
+.tab{border:0;background:none;padding:8px 14px;border-radius:999px;cursor:pointer;color:var(--muted);font-weight:500}
+.tab:hover{background:var(--sunk);color:var(--ink)}
+.tab[aria-current="page"]{background:var(--ink);color:var(--bg)}
+.tab .cnt{display:inline-block;min-width:20px;padding:0 6px;margin-inline-start:6px;border-radius:999px;background:var(--tomato);color:#fff;font-size:12px;text-align:center}
+
+.conn{padding-block:8px;font-size:14px;background:var(--amber-soft);color:var(--amber)}
+.conn.err{background:var(--tomato-soft);color:var(--tomato)}
+
+main{padding-block:24px 64px}
+h2{font-family:var(--display);font-weight:400;font-size:26px;margin:0;text-wrap:balance}
+h3{font-size:15px;margin:0;font-weight:600}
+.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.toolbar .grow{flex:1}
+.eyebrow{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:600}
+
+.btn{border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--tomato);border-color:var(--tomato);color:#fff}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+.btn.ghost:hover{color:var(--ink);background:var(--sunk)}
+.btn.danger{color:var(--tomato)}
+.btn.armed{background:var(--tomato);color:#fff;border-color:var(--tomato)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+input[type=text],input[type=tel],input[type=number],input[type=search],select,textarea{
+  border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:60px}
+label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+label.f > span{color:var(--muted)}
+
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.st-new{background:var(--tomato-soft);color:var(--tomato)}
+.st-preparing{background:var(--amber-soft);color:var(--amber)}
+.st-ready{background:var(--blue-soft);color:var(--blue)}
+.st-done{background:var(--basil-soft);color:var(--basil)}
+.st-cancelled{background:var(--sunk);color:var(--muted)}
+.tag{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 7px;white-space:nowrap}
+
+/* Kitchen board */
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:36px}
+.col{background:var(--sunk);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:10px;min-height:140px;min-width:0}
+.colhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ticket{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;display:grid;gap:8px;min-width:0}
+.ticket.late{border-color:var(--tomato)}
+.trow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.trow .sp{flex:1}
+.tno{font-weight:700}
+.age{font-size:13px;color:var(--muted)}
+.late .age{color:var(--tomato);font-weight:600}
+.items{margin:0;padding:0;list-style:none;font-size:14px;display:grid;gap:2px;border-top:1px dashed var(--line);padding-top:8px}
+.items li{display:flex;gap:8px}
+.items .q{font-weight:700;min-width:22px}
+.items small{color:var(--muted);display:block}
+.empty{color:var(--muted);font-size:14px;padding:16px 8px;text-align:center}
+
+/* tables */
+.tablebox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:start;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.03em;background:var(--sunk)}
+tr:last-child td{border-bottom:0}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--sunk)}
+tr.sel td{background:var(--basil-soft)}
+td.end,th.end{text-align:end}
+
+/* customers */
+.split{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:14px;min-width:0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.stat{background:var(--sunk);border-radius:8px;padding:10px 12px}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+
+/* menu */
+.menugrid{display:grid;gap:22px}
+.menusec{display:grid;gap:10px}
+
+/* reports */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.kpi b{display:block;font-family:var(--display);font-weight:400;font-size:28px;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi span{font-size:13px;color:var(--muted)}
+.chartbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:18px}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--body);font-size:11px}
+.chart .bar{fill:var(--tomato)}
+.chart .bar.zero{fill:var(--line)}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .val{fill:var(--ink);font-weight:600}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.seg{display:inline-flex;background:var(--sunk);border-radius:999px;padding:3px}
+.seg button{border:0;background:none;padding:5px 12px;border-radius:999px;cursor:pointer;font-size:14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0/.12)}
+.meter{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden;min-width:60px}
+.meter i{display:block;height:100%;background:var(--basil)}
+
+/* dialogs */
+dialog{border:0;border-radius:14px;padding:0;background:var(--surface);color:var(--ink);width:min(720px,calc(100vw - 24px));max-height:calc(100dvh - 24px)}
+dialog::backdrop{background:rgb(10 14 11/.5)}
+.dlg{display:flex;flex-direction:column;max-height:calc(100dvh - 24px)}
+.dlghead{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+.dlgbody{padding:18px 20px;overflow-y:auto;display:grid;gap:16px}
+.dlgfoot{display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid var(--line);flex-wrap:wrap}
+.dlgfoot .grow{flex:1}
+.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.formgrid .full{grid-column:1/-1}
+.matches{display:grid;gap:4px}
+.match{display:flex;justify-content:space-between;gap:8px;text-align:start;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;cursor:pointer}
+.match:hover{border-color:var(--basil)}
+.chosen{display:flex;align-items:center;gap:12px;background:var(--basil-soft);border-radius:8px;padding:10px 12px}
+.chosen .grow{flex:1;min-width:0}
+.line{border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px}
+.linetop{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) 76px auto auto;gap:8px;align-items:center}
+.unit{font-weight:600;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--basil);border-color:var(--basil);color:var(--bg)}
+.total{font-family:var(--display);font-size:24px}
+.radio{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.err{color:var(--tomato);font-size:14px}
+
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));inset-inline-start:50%;transform:translateX(50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;z-index:20;box-shadow:0 4px 16px rgb(0 0 0/.25)}
+
+@media (max-width:900px){
+  .board{grid-template-columns:minmax(0,1fr)}
+  .split,.two{grid-template-columns:minmax(0,1fr)}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:560px){
+  .tabs{margin-inline-start:0;width:100%}
+  .formgrid{grid-template-columns:minmax(0,1fr)}
+  .linetop{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hide-sm{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="login" id="login" hidden>
+  <form id="loginForm">
+    <h1 class="brand">ניהול הפיצרייה</h1>
+    <label class="f"><span>סיסמת צוות</span><input type="password" id="pw" autocomplete="current-password" required></label>
+    <span class="err" id="pwErr"></span>
+    <button class="btn primary" type="submit">כניסה</button>
+  </form>
+</div>
+<div id="app">
+<header>
+  <div class="wrap hbar">
+    <h1 class="brand">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="var(--amber)"/><circle cx="16" cy="16" r="11" fill="var(--tomato)"/><circle cx="12" cy="12" r="2.2" fill="var(--bg)"/><circle cx="20" cy="14" r="2.2" fill="var(--bg)"/><circle cx="14" cy="21" r="2.2" fill="var(--bg)"/><circle cx="21" cy="21" r="1.6" fill="var(--basil)"/></svg>
+      ניהול הפיצרייה
+    </h1>
+    <nav class="tabs" aria-label="אזורים">
+      <button class="tab" data-view="orders">הזמנות<span class="cnt num" id="activeCnt" hidden></span></button>
+      <button class="tab" data-view="customers">לקוחות</button>
+      <button class="tab" data-view="menu">תפריט</button>
+      <button class="tab" data-view="reports">דוחות</button>
+    </nav>
+  </div>
+  <div class="conn" id="conn" hidden><div class="wrap" id="connText"></div></div>
+</header>
+
+<main class="wrap" id="view"></main>
+
+<dialog id="orderDlg"><form class="dlg" id="orderForm" method="dialog"></form></dialog>
+<dialog id="custDlg"><form class="dlg" id="custForm" method="dialog"></form></dialog>
+<dialog id="menuDlg"><form class="dlg" id="menuForm" method="dialog"></form></dialog>
+<div class="toast" id="toast" hidden></div>
+</div>
+
+<script>
+
+const SIZES = { S:{label:'אישית', slices:4}, M:{label:'בינונית', slices:6}, L:{label:'משפחתית', slices:8} };
+const STATUS = {
+  new:{label:'חדשה', next:'preparing', nextLabel:'הכנס לתנור'},
+  preparing:{label:'בתנור', next:'ready', nextLabel:'מוכנה'},
+  ready:{label:'מוכנה', next:'done', nextLabel:'נמסרה'},
+  done:{label:'נמסרה'},
+  cancelled:{label:'בוטלה'}
+};
+const KIND = { pizza:'פיצות', topping:'תוספות', extra:'שתייה ומנות צד' };
+const LATE_MIN = 30;
+const DEFAULT_FEE = 15;
+
+const S = {
+  db:null, customers:[], menu:[], orders:[],
+  loaded:{customers:false, menu:false, orders:false},
+  view:'orders', selCustomer:null, custQuery:'', orderQuery:'', range:'7',
+  armed:null, draft:null, editCust:null, editMenu:null, canWrite:true
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => '₪' + (Math.round((+n || 0) * 100) / 100).toLocaleString('he-IL', {maximumFractionDigits:2});
+const shortNo = id => String(id).padStart(4, '0');
+const ts = o => Date.parse(o.createdAt) || 0;
+const dayKey = d => { const x = new Date(d); return x.getFullYear() + '-' + (x.getMonth()+1) + '-' + x.getDate(); };
+const fmtDate = t => new Date(t).toLocaleDateString('he-IL', {day:'numeric', month:'numeric', year:'2-digit'});
+const fmtTime = t => new Date(t).toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
+const fmtWhen = t => dayKey(t) === dayKey(Date.now()) ? 'היום ' + fmtTime(t) : fmtDate(t) + ' ' + fmtTime(t);
+const minsAgo = t => Math.max(0, Math.round((Date.now() - t) / 60000));
+const ageText = m => m < 1 ? 'עכשיו' : m < 60 ? `לפני ${m} דק׳` : `לפני ${Math.floor(m/60)} ש׳ ${m%60} דק׳`;
+const normPhone = p => String(p || '').replace(/\D/g, '');
+const isActive = o => o.status !== 'done' && o.status !== 'cancelled';
+const counted = o => o.status !== 'cancelled';
+
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600);
+}
+/* ---------- server API ---------- */
+async function api(method, url, body){
+  let res;
+  try { res = await fetch(url, { method, headers: body ? { 'Content-Type':'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials:'same-origin' }); }
+  catch(_){ throw new Error('אין חיבור לשרת. בדוק את הרשת ונסה שוב'); }
+  if (res.status === 401 && url !== '/api/login'){ showLogin(); throw new Error('נדרשת כניסה מחדש'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'הפעולה נכשלה');
+  return data;
+}
+// write: run a mutation, refresh state, report errors. `errEl` shows the error inside a dialog.
+async function write(method, url, body, errEl){
+  try { const out = await api(method, url, body); await refresh(true); return out || true; }
+  catch(e){ if (errEl) errEl.textContent = e.message; else toast(e.message); return false; }
+}
+
+/* ---------- connection ---------- */
+function setConn(kind, text){
+  const c = $('#conn');
+  if (!kind){ c.hidden = true; return; }
+  c.hidden = false; c.classList.toggle('err', kind === 'err'); $('#connText').textContent = text;
+}
+
+S.rev = -1; S.db = true;
+async function refresh(force){
+  if (!force){
+    const r = await api('GET', '/api/rev');
+    if (r.rev === S.rev) return;
+  }
+  const st = await api('GET', '/api/state');
+  S.rev = st.rev; S.customers = st.customers; S.menu = st.menu; S.orders = st.orders;
+  S.loaded = { customers:true, menu:true, orders:true };
+  // don't wipe what someone is typing in a search box
+  const typing = ['orderSearch','custSearch'].includes(document.activeElement?.id);
+  if (!typing) render();
+  if (S.draft && $('#orderDlg').open) renderLines();
+}
+function showLogin(){ $('#app').hidden = true; $('#login').hidden = false; $('#pw').focus(); }
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault(); $('#pwErr').textContent = '';
+  try { await api('POST', '/api/login', { password: $('#pw').value }); $('#pw').value = ''; $('#login').hidden = true; $('#app').hidden = false; await start(); }
+  catch(err){ $('#pwErr').textContent = err.message; }
+});
+let polling = null;
+async function start(){
+  try { await refresh(true); setConn(null); } catch(e){ setConn('err', e.message); }
+  clearInterval(polling);
+  polling = setInterval(async () => {
+    try { await refresh(false); if (!$('#conn').hidden) setConn(null); }
+    catch(e){ setConn('err', 'אין חיבור לשרת. הנתונים על המסך עלולים להיות לא מעודכנים.'); }
+  }, 4000);
+}
+async function boot(){
+  route(); render();
+  try {
+    const s = await api('GET', '/api/session');
+    if (s.needsLogin && !s.loggedIn) return showLogin();
+  } catch(e){ setConn('err', e.message); return; }
+  start();
+}
+
+/* ---------- routing ---------- */
+function route(){
+  const h = location.hash.replace('#', '');
+  S.view = ['orders','customers','menu','reports'].includes(h) ? h : 'orders';
+}
+addEventListener('hashchange', () => { route(); render(); });
+
+/* ---------- helpers ---------- */
+const menuBy = kind => S.menu.filter(m => m.kind === kind).sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || String(a.name).localeCompare(b.name, 'he'));
+const custById = id => S.customers.find(c => c.id === id);
+function custStats(id){
+  const os = S.orders.filter(o => o.customerId === id).sort((a,b) => ts(b) - ts(a));
+  const ok = os.filter(counted);
+  const spent = ok.reduce((s,o) => s + (+o.total || 0), 0);
+  const fav = {};
+  ok.forEach(o => (o.items || []).forEach(i => { if (i.kind === 'pizza') fav[i.name] = (fav[i.name] || 0) + (+i.qty || 1); }));
+  const favName = Object.entries(fav).sort((a,b) => b[1] - a[1])[0];
+  return { orders:os, count:ok.length, spent, last: os[0] ? ts(os[0]) : null, fav: favName ? favName[0] : null };
+}
+function itemText(i){
+  let t = i.name;
+  if (i.size && SIZES[i.size]) t += ' ' + SIZES[i.size].label;
+  return t;
+}
+function armBtn(key, label, armedLabel){
+  const on = S.armed === key;
+  return `<button type="button" class="btn small ${on ? 'armed' : 'danger'}" data-action="arm" data-key="${esc(key)}">${on ? armedLabel : label}</button>`;
+}
+
+/* ---------- render ---------- */
+function render(){
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-current', t.dataset.view === S.view ? 'page' : 'false'));
+  const act = S.orders.filter(isActive).length;
+  const ac = $('#activeCnt'); ac.hidden = !act; ac.textContent = act;
+  const v = $('#view');
+  const keepFocus = document.activeElement && document.activeElement.id;
+  const caret = document.activeElement && document.activeElement.selectionStart;
+  v.innerHTML = ({ orders:viewOrders, customers:viewCustomers, menu:viewMenu, reports:viewReports })[S.view]();
+  if (keepFocus && v.querySelector('#' + keepFocus)){
+    const el = document.getElementById(keepFocus); el.focus();
+    try { if (caret != null) el.setSelectionRange(caret, caret); } catch(_){}
+  }
+}
+
+function loadingNote(){
+  return S.db && !Object.values(S.loaded).every(Boolean) ? '<p class="empty">טוען נתונים…</p>' : '';
+}
+
+/* orders */
+function ticket(o){
+  const m = minsAgo(ts(o)); const late = m >= LATE_MIN && o.status !== 'ready';
+  const st = STATUS[o.status] || STATUS.new;
+  const items = (o.items || []).map(i => `<li><span class="q num">${+i.qty || 1}×</span><span>${esc(itemText(i))}${i.toppings && i.toppings.length ? `<small>${esc(i.toppings.map(t => t.name).join(', '))}</small>` : ''}</span></li>`).join('');
+  const nextLabel = o.status === 'ready' ? (o.type === 'pickup' ? 'נאספה' : 'נמסרה') : st.nextLabel;
+  return `<article class="ticket ${late ? 'late' : ''}">
+    <div class="trow"><span class="tno num">#${shortNo(o.id)}</span><span class="tag">${o.type === 'pickup' ? 'איסוף' : 'משלוח'}</span><span class="sp"></span><span class="age">${ageText(m)}</span></div>
+    <div><b>${esc(o.customerName)}</b> · <span class="num" dir="ltr">${esc(o.customerPhone)}</span>${o.type !== 'pickup' && o.address ? `<div class="age">${esc(o.address)}</div>` : ''}</div>
+    <ul class="items">${items}</ul>
+    ${o.note ? `<div class="age">הערה: ${esc(o.note)}</div>` : ''}
+    <div class="trow"><b class="num">${money(o.total)}</b><span class="sp"></span>
+      ${armBtn('cancel:' + o.id, 'בטל', 'לחץ שוב לביטול')}
+      <button type="button" class="btn small primary" data-action="advance" data-id="${o.id}">${nextLabel}</button></div>
+  </article>`;
+}
+function viewOrders(){
+  const active = S.orders.filter(isActive).sort((a,b) => ts(a) - ts(b));
+  const cols = ['new','preparing','ready'].map(st => {
+    const list = active.filter(o => (o.status || 'new') === st);
+    const title = st === 'ready' ? 'מוכנה · במשלוח / לאיסוף' : STATUS[st].label;
+    return `<section class="col" aria-label="${title}">
+      <div class="colhead"><span class="pill st-${st}">${title}</span><span class="age num">${list.length}</span></div>
+      ${list.length ? list.map(ticket).join('') : `<p class="empty">${st === 'new' ? 'אין הזמנות חדשות. לחץ "הזמנה חדשה" כדי לפתוח אחת.' : 'ריק'}</p>`}
+    </section>`;
+  }).join('');
+  const q = S.orderQuery.trim();
+  let hist = S.orders.slice().sort((a,b) => ts(b) - ts(a));
+  if (q) hist = hist.filter(o => (o.customerName || '').includes(q) || normPhone(o.customerPhone).includes(normPhone(q) || '§') || shortNo(o.id).includes(q.toUpperCase()));
+  hist = hist.slice(0, 60);
+  const rows = hist.map(o => `<tr>
+      <td class="num">#${shortNo(o.id)}</td>
+      <td class="num">${fmtWhen(ts(o))}</td>
+      <td>${esc(o.customerName)}</td>
+      <td class="hide-sm">${esc((o.items || []).map(i => (i.qty > 1 ? i.qty + '× ' : '') + itemText(i)).join(', '))}</td>
+      <td><span class="pill st-${o.status}">${(STATUS[o.status] || STATUS.new).label}</span></td>
+      <td class="end num">${money(o.total)}</td>
+    </tr>`).join('');
+  return `<div class="toolbar"><h2>הזמנות פעילות</h2><span class="grow"></span>
+      <button type="button" class="btn primary" data-action="newOrder">+ הזמנה חדשה</button></div>
+    ${loadingNote()}
+    <div class="board">${cols}</div>
+    <div class="toolbar"><h2>כל ההזמנות</h2><span class="grow"></span>
+      <input type="search" id="orderSearch" placeholder="חיפוש לפי שם, טלפון או מספר הזמנה" value="${esc(S.orderQuery)}" style="max-width:320px"></div>
+    <div class="tablebox"><table>
+      <thead><tr><th>מס׳</th><th>מתי</th><th>לקוח</th><th class="hide-sm">פריטים</th><th>סטטוס</th><th class="end">סה״כ</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="empty">${q ? 'לא נמצאו הזמנות' : 'עוד לא נרשמו הזמנות'}</td></tr>`}</tbody>
+    </table></div>`;
+}
+
+/* customers */
+function viewCustomers(){
+  const q = S.custQuery.trim();
+  let list = S.customers.slice().sort((a,b) => String(a.name).localeCompare(b.name, 'he'));
+  if (q) list = list.filter(c => (c.name || '').includes(q) || (normPhone(q) && normPhone(c.phone).includes(normPhone(q))) || (c.address || '').includes(q));
+  const rows = list.map(c => { const s = custStats(c.id); return `<tr class="click ${S.selCustomer === c.id ? 'sel' : ''}" data-action="selCust" data-id="${c.id}">
+      <td><b>${esc(c.name)}</b></td><td class="num" dir="ltr" style="text-align:end">${esc(c.phone)}</td>
+      <td class="hide-sm">${esc(c.address)}</td><td class="end num">${s.count}</td><td class="end num">${money(s.spent)}</td></tr>`; }).join('');
+  const sel = custById(S.selCustomer);
+  return `<div class="toolbar"><h2>לקוחות</h2><span class="age num">${S.customers.length} רשומים</span><span class="grow"></span>
+      <input type="search" id="custSearch" placeholder="חיפוש לפי שם, טלפון או כתובת" value="${esc(S.custQuery)}" style="max-width:300px">
+      <button type="button" class="btn primary" data-action="newCust">+ לקוח חדש</button></div>
+    ${loadingNote()}
+    <div class="split">
+      <div class="tablebox"><table>
+        <thead><tr><th>שם</th><th>טלפון</th><th class="hide-sm">כתובת</th><th class="end">הזמנות</th><th class="end">סה״כ</th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="5" class="empty">${q ? 'לא נמצאו לקוחות' : 'אין עדיין לקוחות. הוסף לקוח ראשון, או פתח הזמנה ולקוח חדש יישמר אוטומטית.'}</td></tr>`}</tbody>
+      </table></div>
+      ${sel ? custPanel(sel) : `<div class="panel"><p class="empty">בחר לקוח מהרשימה כדי לראות פרטים והיסטוריית הזמנות.</p></div>`}
+    </div>`;
+}
+function custPanel(c){
+  const s = custStats(c.id);
+  const hist = s.orders.map(o => `<tr><td class="num">${fmtWhen(ts(o))}</td><td>${esc((o.items || []).map(i => (i.qty > 1 ? i.qty + '× ' : '') + itemText(i)).join(', '))}</td><td><span class="pill st-${o.status}">${(STATUS[o.status]||STATUS.new).label}</span></td><td class="end num">${money(o.total)}</td></tr>`).join('');
+  return `<aside class="panel">
+    <div class="trow"><h2 style="font-size:22px">${esc(c.name)}</h2><span class="sp"></span>
+      <button type="button" class="btn small" data-action="editCust" data-id="${c.id}">עריכה</button>
+      ${armBtn('delcust:' + c.id, 'מחיקה', 'לחץ שוב למחיקה')}</div>
+    <dl class="kv"><dt>טלפון</dt><dd class="num" dir="ltr" style="text-align:end">${esc(c.phone)}</dd>
+      <dt>כתובת</dt><dd>${esc(c.address) || '—'}</dd>
+      ${c.notes ? `<dt>הערות</dt><dd>${esc(c.notes)}</dd>` : ''}
+      <dt>לקוח מאז</dt><dd class="num">${c.createdAt ? fmtDate(Date.parse(c.createdAt)) : '—'}</dd></dl>
+    <div class="stats">
+      <div class="stat"><b>${s.count}</b><span>הזמנות</span></div>
+      <div class="stat"><b>${money(s.spent)}</b><span>סה״כ קניות</span></div>
+      <div class="stat"><b>${s.count ? money(s.spent / s.count) : '—'}</b><span>ממוצע להזמנה</span></div>
+    </div>
+    ${s.fav ? `<div class="age">הפיצה האהובה: <b style="color:var(--ink)">${esc(s.fav)}</b>${s.last ? ` · הזמנה אחרונה ${fmtWhen(s.last)}` : ''}</div>` : ''}
+    <button type="button" class="btn primary" data-action="newOrder" data-cust="${c.id}">+ הזמנה חדשה ל${esc(c.name)}</button>
+    <div><div class="eyebrow" style="margin-bottom:6px">היסטוריית הזמנות</div>
+    <div class="tablebox"><table><tbody>${hist || '<tr><td class="empty">אין הזמנות עדיין</td></tr>'}</tbody></table></div></div>
+  </aside>`;
+}
+
+/* menu */
+function viewMenu(){
+  const sec = kind => {
+    const list = menuBy(kind);
+    const head = kind === 'pizza'
+      ? `<th>שם</th>${Object.values(SIZES).map(z => `<th class="end">${z.label} <span class="age">(${z.slices} מש׳)</span></th>`).join('')}<th>זמין</th><th></th>`
+      : `<th>שם</th><th class="end">מחיר</th><th>זמין</th><th></th>`;
+    const rows = list.map(m => `<tr>
+      <td><b>${esc(m.name)}</b>${m.desc ? `<div class="age">${esc(m.desc)}</div>` : ''}</td>
+      ${kind === 'pizza' ? Object.keys(SIZES).map(k => `<td class="end num">${money(m.prices?.[k])}</td>`).join('') : `<td class="end num">${money(m.price)}</td>`}
+      <td>${m.active === false ? '<span class="pill st-cancelled">לא זמין</span>' : '<span class="pill st-done">זמין</span>'}</td>
+      <td class="end" style="white-space:nowrap"><button type="button" class="btn small" data-action="editMenu" data-id="${m.id}">עריכה</button> ${armBtn('delmenu:' + m.id, 'מחיקה', 'לחץ שוב')}</td></tr>`).join('');
+    const cols = kind === 'pizza' ? 6 : 4;
+    return `<section class="menusec"><div class="toolbar" style="margin:0"><h3 style="font-family:var(--display);font-weight:400;font-size:20px">${KIND[kind]}</h3><span class="grow"></span>
+      <button type="button" class="btn small" data-action="newMenu" data-kind="${kind}">+ הוסף</button></div>
+      <div class="tablebox"><table><thead><tr>${head}</tr></thead><tbody>${rows || `<tr><td colspan="${cols}" class="empty">אין פריטים. לחץ "הוסף" כדי ליצור את הראשון.</td></tr>`}</tbody></table></div></section>`;
+  };
+  return `<div class="toolbar"><h2>תפריט ומחירים</h2></div>${loadingNote()}<div class="menugrid">${sec('pizza')}${sec('topping')}${sec('extra')}</div>
+    <p class="age" style="margin-top:14px">מחיר תוספת מתווסף לכל פיצה שהיא נבחרת עליה. פריט שסומן "לא זמין" לא יופיע בטופס ההזמנה.</p>`;
+}
+
+/* reports */
+function viewReports(){
+  const now = Date.now();
+  const startToday = new Date(); startToday.setHours(0,0,0,0);
+  const from = S.range === '1' ? startToday.getTime() : S.range === 'all' ? 0 : startToday.getTime() - (+S.range - 1) * 864e5;
+  const inRange = S.orders.filter(o => ts(o) >= from && ts(o) <= now + 6e4);
+  const ok = inRange.filter(counted);
+  const revenue = ok.reduce((s,o) => s + (+o.total || 0), 0);
+  const newCust = S.customers.filter(c => Date.parse(c.createdAt) >= from).length;
+  const cancelled = inRange.length - ok.length;
+
+  const days = S.range === '30' || S.range === 'all' ? 30 : 7;
+  const buckets = [];
+  for (let i = days - 1; i >= 0; i--){ const d = new Date(startToday.getTime() - i * 864e5); buckets.push({ key:dayKey(d), d, v:0 }); }
+  const bmap = Object.fromEntries(buckets.map(b => [b.key, b]));
+  S.orders.filter(counted).forEach(o => { const b = bmap[dayKey(ts(o))]; if (b) b.v += +o.total || 0; });
+  const chart = barChart(buckets);
+
+  const pz = {};
+  ok.forEach(o => (o.items || []).forEach(i => { if (i.kind !== 'pizza') return; const k = i.name; pz[k] ??= { q:0, r:0 }; pz[k].q += +i.qty || 1; pz[k].r += (+i.unit || 0) * (+i.qty || 1); }));
+  const topP = Object.entries(pz).sort((a,b) => b[1].q - a[1].q).slice(0, 8);
+  const maxQ = topP[0]?.[1].q || 1;
+  const cu = {};
+  ok.forEach(o => { const k = o.customerId || o.customerName; cu[k] ??= { name:o.customerName, n:0, r:0 }; cu[k].n++; cu[k].r += +o.total || 0; });
+  const topC = Object.values(cu).sort((a,b) => b.r - a.r).slice(0, 8);
+  const sizes = {}; ok.forEach(o => (o.items || []).forEach(i => { if (i.size) sizes[i.size] = (sizes[i.size] || 0) + (+i.qty || 1); }));
+  const del = ok.filter(o => o.type !== 'pickup').length;
+
+  const seg = [['1','היום'],['7','7 ימים'],['30','30 יום'],['all','הכל']].map(([k,l]) => `<button type="button" data-action="range" data-r="${k}" aria-pressed="${S.range === k}">${l}</button>`).join('');
+  return `<div class="toolbar"><h2>דוחות ומכירות</h2><span class="grow"></span><div class="seg" role="group" aria-label="טווח">${seg}</div></div>
+    ${loadingNote()}
+    <div class="kpis">
+      <div class="kpi"><b>${money(revenue)}</b><span>הכנסות</span></div>
+      <div class="kpi"><b>${ok.length}</b><span>הזמנות${cancelled ? ` · ${cancelled} בוטלו` : ''}</span></div>
+      <div class="kpi"><b>${ok.length ? money(revenue / ok.length) : '—'}</b><span>ממוצע להזמנה</span></div>
+      <div class="kpi"><b>${newCust}</b><span>לקוחות חדשים</span></div>
+    </div>
+    <div class="chartbox"><div class="trow" style="margin-bottom:8px"><h3>הכנסות לפי יום · ${days} הימים האחרונים</h3><span class="sp"></span>
+      <span class="age">${ok.length ? `משלוחים ${Math.round(del / ok.length * 100)}% · איסוף ${100 - Math.round(del / ok.length * 100)}%` : ''}</span></div>${chart}</div>
+    <div class="two">
+      <section class="panel"><h3>הפיצות הנמכרות</h3>
+        ${topP.length ? `<table><thead><tr><th>פיצה</th><th class="end">יח׳</th><th></th><th class="end">הכנסה</th></tr></thead><tbody>${topP.map(([n,v]) => `<tr><td>${esc(n)}</td><td class="end num">${v.q}</td><td style="width:30%"><div class="meter"><i style="width:${v.q / maxQ * 100}%"></i></div></td><td class="end num">${money(v.r)}</td></tr>`).join('')}</tbody></table>
+        <div class="age">לפי גודל: ${Object.entries(SIZES).map(([k,z]) => `${z.label} ${sizes[k] || 0}`).join(' · ')}</div>` : '<p class="empty">אין מכירות בטווח הזה</p>'}
+      </section>
+      <section class="panel"><h3>הלקוחות המובילים</h3>
+        ${topC.length ? `<table><thead><tr><th>לקוח</th><th class="end">הזמנות</th><th class="end">סה״כ</th></tr></thead><tbody>${topC.map(c => `<tr><td>${esc(c.name)}</td><td class="end num">${c.n}</td><td class="end num">${money(c.r)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty">אין מכירות בטווח הזה</p>'}
+      </section>
+    </div>`;
+}
+function barChart(b){
+  const W = 720, H = 220, pl = 44, pr = 8, pt = 22, pb = 26;
+  const max = Math.max(...b.map(x => x.v), 0);
+  const step = niceStep(max / 4 || 50); const top = Math.max(step * 4, step * Math.ceil(max / step));
+  const iw = W - pl - pr, ih = H - pt - pb, bw = iw / b.length;
+  const y = v => pt + ih - (v / top) * ih;
+  let g = '';
+  for (let v = 0; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${v >= 1000 ? (v/1000) + 'K' : v}</text>`;
+  const mi = b.reduce((m,x,i) => x.v > b[m].v ? i : m, 0);
+  const every = b.length > 14 ? 5 : 1;
+  const bars = b.map((x,i) => {
+    const h = Math.max(x.v ? 2 : 1, (x.v / top) * ih), xx = pl + i * bw + bw * 0.18, w = bw * 0.64;
+    const lbl = (i % every === 0 || i === b.length - 1) ? `<text x="${xx + w/2}" y="${H - 8}" text-anchor="middle">${x.d.getDate()}/${x.d.getMonth()+1}</text>` : '';
+    const val = i === mi && x.v ? `<text class="val" x="${xx + w/2}" y="${y(x.v) - 6}" text-anchor="middle">₪${Math.round(x.v)}</text>` : '';
+    return `<rect class="bar ${x.v ? '' : 'zero'}" x="${xx}" y="${pt + ih - h}" width="${w}" height="${h}" rx="2"><title>${fmtDate(x.d)}: ${money(x.v)}</title></rect>${lbl}${val}`;
+  }).join('');
+  return `<div dir="ltr" style="overflow-x:auto"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="הכנסות לפי יום">${g}${bars}</svg></div>`;
+}
+function niceStep(x){ const p = Math.pow(10, Math.floor(Math.log10(x))); const n = x / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+
+/* ---------- order dialog ---------- */
+function openOrder(custId){
+  const c = custById(custId);
+  S.draft = { customerId: c ? c.id : null, newCust:null, q:'', items:[], type:'delivery', fee:DEFAULT_FEE, address: c ? (c.address || '') : '', note:'', error:'' };
+  const firstPizza = menuBy('pizza').find(m => m.active !== false);
+  if (firstPizza) S.draft.items.push({ menuId:firstPizza.id, size:'L', qty:1, tops:[] });
+  renderOrderForm(); $('#orderDlg').showModal();
+  setTimeout(() => { const s = $('#ocSearch'); if (s) s.focus(); }, 30);
+}
+function renderOrderForm(){
+  $('#orderForm').innerHTML = `
+    <div class="dlghead"><h2 style="font-size:22px">הזמנה חדשה</h2><button type="button" class="btn ghost" data-action="closeDlg" aria-label="סגור">✕</button></div>
+    <div class="dlgbody">
+      <section><div class="eyebrow" style="margin-bottom:6px">לקוח</div><div id="custBox"></div></section>
+      <section><div class="eyebrow" style="margin-bottom:6px">פריטים</div><div id="lines" style="display:grid;gap:10px"></div>
+        <div class="trow" style="margin-top:10px"><button type="button" class="btn small" data-action="addLine" data-kind="pizza">+ פיצה</button><button type="button" class="btn small" data-action="addLine" data-kind="extra">+ שתייה / מנה צד</button></div></section>
+      <section class="formgrid">
+        <div class="full trow" role="radiogroup" aria-label="סוג">
+          <label class="radio"><input type="radio" name="otype" value="delivery" ${S.draft.type === 'delivery' ? 'checked' : ''}> משלוח</label>
+          <label class="radio"><input type="radio" name="otype" value="pickup" ${S.draft.type === 'pickup' ? 'checked' : ''}> איסוף עצמי</label>
+        </div>
+        <label class="f" id="addrWrap" ${S.draft.type === 'pickup' ? 'hidden' : ''}><span>כתובת למשלוח</span><input type="text" id="oAddress" value="${esc(S.draft.address)}"></label>
+        <label class="f" id="feeWrap" ${S.draft.type === 'pickup' ? 'hidden' : ''}><span>דמי משלוח (₪)</span><input type="number" id="oFee" min="0" step="1" value="${S.draft.fee}"></label>
+        <label class="f full"><span>הערה למטבח</span><input type="text" id="oNote" placeholder="למשל: חתוך ל-12, בלי בצל בחצי" value="${esc(S.draft.note)}"></label>
+      </section>
+    </div>
+    <div class="dlgfoot"><div><div class="age">סה״כ לתשלום</div><div class="total num" id="oTotal"></div></div><span class="grow"></span>
+      <span class="err" id="oErr"></span>
+      <button type="button" class="btn" data-action="closeDlg">ביטול</button>
+      <button type="button" class="btn primary" data-action="saveOrder">שמור הזמנה</button></div>`;
+  renderCustBox(); renderLines();
+}
+function renderCustBox(){
+  const d = S.draft, box = $('#custBox'); if (!box) return;
+  const c = custById(d.customerId);
+  if (c){
+    const s = custStats(c.id);
+    box.innerHTML = `<div class="chosen"><div class="grow"><b>${esc(c.name)}</b> · <span class="num" dir="ltr">${esc(c.phone)}</span>
+      <div class="age">${s.count ? `${s.count} הזמנות קודמות${s.fav ? ' · בדרך כלל ' + esc(s.fav) : ''}` : 'לקוח ללא הזמנות קודמות'}</div></div>
+      <button type="button" class="btn small" data-action="clearCust">החלף</button></div>`;
+    return;
+  }
+  if (d.newCust){
+    box.innerHTML = `<div class="formgrid">
+      <label class="f"><span>שם מלא</span><input type="text" id="ncName" value="${esc(d.newCust.name)}"></label>
+      <label class="f"><span>טלפון</span><input type="tel" id="ncPhone" dir="ltr" value="${esc(d.newCust.phone)}"></label>
+      <div class="full trow"><span class="age">הלקוח יישמר ברשימת הלקוחות עם שמירת ההזמנה.</span><span class="sp"></span><button type="button" class="btn small ghost" data-action="clearCust">חיפוש לקוח קיים</button></div></div>`;
+    return;
+  }
+  box.innerHTML = `<div style="display:grid;gap:8px"><input type="search" id="ocSearch" placeholder="הקלד טלפון או שם" value="${esc(d.q)}" autocomplete="off">
+    <div class="matches" id="ocMatches"></div></div>`;
+  renderMatches();
+}
+function renderMatches(){
+  const el = $('#ocMatches'); if (!el) return;
+  const q = S.draft.q.trim(), p = normPhone(q);
+  if (!q){ el.innerHTML = `<button type="button" class="btn small" data-action="newCustInline" style="justify-self:start">+ לקוח חדש</button>`; return; }
+  const m = S.customers.filter(c => (c.name || '').includes(q) || (p.length >= 2 && normPhone(c.phone).includes(p))).slice(0, 6);
+  el.innerHTML = m.map(c => `<button type="button" class="match" data-action="pickCust" data-id="${c.id}"><span><b>${esc(c.name)}</b> <span class="age">${esc(c.address)}</span></span><span class="num" dir="ltr">${esc(c.phone)}</span></button>`).join('')
+    + `<button type="button" class="btn small" data-action="newCustInline" style="justify-self:start">+ לקוח חדש${m.length ? '' : ': ' + esc(q)}</button>`;
+}
+function lineUnit(l){
+  const m = S.menu.find(x => x.id === l.menuId); if (!m) return 0;
+  if (m.kind === 'pizza'){
+    const tops = l.tops.map(id => S.menu.find(x => x.id === id)).filter(Boolean);
+    return (+m.prices?.[l.size] || 0) + tops.reduce((s,t) => s + (+t.price || 0), 0);
+  }
+  return +m.price || 0;
+}
+function draftTotal(){
+  const d = S.draft;
+  const sub = d.items.reduce((s,l) => s + lineUnit(l) * (+l.qty || 0), 0);
+  return sub + (d.type === 'delivery' && d.items.length ? (+d.fee || 0) : 0);
+}
+function renderLines(){
+  const el = $('#lines'); if (!el) return;
+  const pizzas = menuBy('pizza').filter(m => m.active !== false), extras = menuBy('extra').filter(m => m.active !== false), tops = menuBy('topping').filter(m => m.active !== false);
+  if (!S.menu.length){ el.innerHTML = '<p class="empty">התפריט ריק. הוסף פיצות בלשונית "תפריט" כדי להתחיל לקבל הזמנות.</p>'; updateTotal(); return; }
+  el.innerHTML = S.draft.items.map((l, i) => {
+    const m = S.menu.find(x => x.id === l.menuId); const isP = m && m.kind === 'pizza';
+    const opts = (isP || !m ? pizzas : extras).map(x => `<option value="${x.id}" ${x.id === l.menuId ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
+    return `<div class="line" data-i="${i}">
+      <div class="linetop">
+        <select data-f="menuId" aria-label="פריט">${opts}</select>
+        ${isP ? `<select data-f="size" aria-label="גודל">${Object.entries(SIZES).map(([k,z]) => `<option value="${k}" ${l.size === k ? 'selected' : ''}>${z.label} · ${z.slices} משולשים · ${money(m.prices?.[k])}</option>`).join('')}</select>` : '<span></span>'}
+        <input type="number" data-f="qty" min="1" step="1" value="${l.qty}" aria-label="כמות">
+        <span class="unit num">${money(lineUnit(l) * (+l.qty || 0))}</span>
+        <button type="button" class="btn small ghost" data-action="rmLine" aria-label="הסר פריט">✕</button>
+      </div>
+      ${isP && tops.length ? `<div class="chips" aria-label="תוספות">${tops.map(t => `<button type="button" class="chip" data-action="togTop" data-t="${t.id}" aria-pressed="${l.tops.includes(t.id)}">${esc(t.name)} +${money(t.price)}</button>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('') || '<p class="empty">אין פריטים בהזמנה</p>';
+  updateTotal();
+}
+function updateTotal(){ const t = $('#oTotal'); if (t) t.textContent = money(draftTotal()); }
+
+async function saveOrder(){
+  const d = S.draft, err = $('#oErr'); err.textContent = '';
+  d.address = ($('#oAddress')?.value || '').trim(); d.note = ($('#oNote')?.value || '').trim(); d.fee = +($('#oFee')?.value || 0);
+  let cust = custById(d.customerId);
+  if (!cust && d.newCust){
+    d.newCust.name = ($('#ncName')?.value || '').trim(); d.newCust.phone = ($('#ncPhone')?.value || '').trim();
+    if (!d.newCust.name || normPhone(d.newCust.phone).length < 7){ err.textContent = 'מלא שם וטלפון של הלקוח'; return; }
+    cust = S.customers.find(c => normPhone(c.phone) === normPhone(d.newCust.phone));
+  }
+  if (!cust && !d.newCust){ err.textContent = 'בחר לקוח או הוסף לקוח חדש'; return; }
+  const items = d.items.filter(l => S.menu.find(x => x.id === l.menuId) && +l.qty > 0);
+  if (!items.length){ err.textContent = 'הוסף לפחות פריט אחד'; return; }
+  if (d.type === 'delivery' && !d.address){ err.textContent = 'הזן כתובת למשלוח'; return; }
+  const btn = document.querySelector('[data-action="saveOrder"]'); btn.disabled = true;
+  const ok = await write('POST', '/api/orders', {
+    customerId: cust ? cust.id : null,
+    newCustomer: cust ? null : { name:d.newCust.name, phone:d.newCust.phone },
+    type:d.type, address:d.address, deliveryFee:d.fee, note:d.note,
+    items: items.map(l => ({ menuId:l.menuId, size:l.size, qty:+l.qty, toppingIds:l.tops }))
+  }, err);
+  btn.disabled = false;
+  if (ok){ $('#orderDlg').close(); S.draft = null; toast('ההזמנה נשמרה ונשלחה למטבח'); if (S.view !== 'orders') location.hash = 'orders'; }
+}
+
+/* ---------- customer dialog ---------- */
+function openCust(id){
+  const c = custById(id) || { name:'', phone:'', address:'', notes:'' };
+  S.editCust = id || null;
+  $('#custForm').innerHTML = `
+    <div class="dlghead"><h2 style="font-size:22px">${id ? 'עריכת לקוח' : 'לקוח חדש'}</h2><button type="button" class="btn ghost" data-action="closeDlg" aria-label="סגור">✕</button></div>
+    <div class="dlgbody"><div class="formgrid">
+      <label class="f"><span>שם מלא</span><input type="text" id="cName" value="${esc(c.name)}" required></label>
+      <label class="f"><span>טלפון</span><input type="tel" id="cPhone" dir="ltr" value="${esc(c.phone)}" required></label>
+      <label class="f full"><span>כתובת</span><input type="text" id="cAddress" placeholder="רחוב, מספר, דירה, עיר" value="${esc(c.address)}"></label>
+      <label class="f full"><span>הערות</span><textarea id="cNotes" placeholder="למשל: קומה 3 בלי מעלית, אלרגיה לאגוזים">${esc(c.notes)}</textarea></label>
+    </div></div>
+    <div class="dlgfoot"><span class="err" id="cErr"></span><span class="grow"></span>
+      <button type="button" class="btn" data-action="closeDlg">ביטול</button><button type="button" class="btn primary" data-action="saveCust">שמור</button></div>`;
+  $('#custDlg').showModal();
+}
+async function saveCust(){
+  const name = $('#cName').value.trim(), phone = $('#cPhone').value.trim(), address = $('#cAddress').value.trim(), notes = $('#cNotes').value.trim();
+  if (!name || normPhone(phone).length < 7){ $('#cErr').textContent = 'מלא שם וטלפון תקין'; return; }
+  const dup = S.customers.find(c => normPhone(c.phone) === normPhone(phone) && c.id !== S.editCust);
+  if (dup){ $('#cErr').textContent = `הטלפון כבר שייך ל${dup.name}`; return; }
+  const id = S.editCust;
+  const ok = await write(id ? 'PUT' : 'POST', id ? '/api/customers/' + id : '/api/customers', { name, phone, address, notes }, $('#cErr'));
+  if (ok && !id) S.selCustomer = ok.id;
+  if (ok){ $('#custDlg').close(); toast(id ? 'פרטי הלקוח עודכנו' : 'הלקוח נוסף'); render(); }
+}
+
+/* ---------- menu dialog ---------- */
+function openMenu(id, kind){
+  const m = S.menu.find(x => x.id === id) || { kind: kind || 'pizza', name:'', desc:'', prices:{S:'',M:'',L:''}, price:'', active:true };
+  S.editMenu = id || null; const k = m.kind;
+  $('#menuForm').innerHTML = `
+    <div class="dlghead"><h2 style="font-size:22px">${id ? 'עריכת פריט' : 'פריט חדש'} · ${KIND[k]}</h2><button type="button" class="btn ghost" data-action="closeDlg" aria-label="סגור">✕</button></div>
+    <div class="dlgbody"><input type="hidden" id="mKind" value="${k}"><div class="formgrid">
+      <label class="f full"><span>שם</span><input type="text" id="mName" value="${esc(m.name)}"></label>
+      ${k === 'pizza' ? `<label class="f full"><span>תיאור</span><input type="text" id="mDesc" value="${esc(m.desc)}"></label>
+        ${Object.entries(SIZES).map(([s,z]) => `<label class="f"><span>מחיר ${z.label} (${z.slices} משולשים) ₪</span><input type="number" id="mP${s}" min="0" step="1" value="${m.prices?.[s] ?? ''}"></label>`).join('')}`
+        : `<label class="f"><span>מחיר ₪</span><input type="number" id="mPrice" min="0" step="0.5" value="${m.price ?? ''}"></label>`}
+      <label class="radio full"><input type="checkbox" id="mActive" ${m.active !== false ? 'checked' : ''}> זמין להזמנה</label>
+    </div></div>
+    <div class="dlgfoot"><span class="err" id="mErr"></span><span class="grow"></span>
+      <button type="button" class="btn" data-action="closeDlg">ביטול</button><button type="button" class="btn primary" data-action="saveMenu">שמור</button></div>`;
+  $('#menuDlg').showModal();
+}
+async function saveMenu(){
+  const kind = $('#mKind').value, name = $('#mName').value.trim(), active = $('#mActive').checked;
+  if (!name){ $('#mErr').textContent = 'הזן שם לפריט'; return; }
+  const data = { kind, name, active };
+  if (kind === 'pizza'){
+    data.desc = $('#mDesc').value.trim();
+    data.prices = Object.fromEntries(Object.keys(SIZES).map(s => [s, +$('#mP' + s).value || 0]));
+    if (!data.prices.S && !data.prices.M && !data.prices.L){ $('#mErr').textContent = 'הזן לפחות מחיר אחד'; return; }
+  } else data.price = +$('#mPrice').value || 0;
+  const id = S.editMenu;
+  const ok = await write(id ? 'PUT' : 'POST', id ? '/api/menu/' + id : '/api/menu', data, $('#mErr'));
+  if (ok){ $('#menuDlg').close(); toast('התפריט עודכן'); }
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-action],[data-view]'); if (!t) return;
+  if (t.dataset.view){ location.hash = t.dataset.view; return; }
+  const a = t.dataset.action, id = t.dataset.id;
+  switch (a){
+    case 'newOrder': openOrder(t.dataset.cust); break;
+    case 'closeDlg': t.closest('dialog').close(); break;
+    case 'advance': {
+      const o = S.orders.find(x => x.id === id); const nx = STATUS[o?.status || 'new']?.next; if (!nx) break;
+      const ok = await write('POST', `/api/orders/${id}/status`, { status:'next' });
+      if (ok) toast(`הזמנה #${shortNo(id)}: ${STATUS[nx].label}`); break;
+    }
+    case 'arm': {
+      const key = t.dataset.key;
+      if (S.armed !== key){ S.armed = key; render(); clearTimeout(S._armT); S._armT = setTimeout(() => { S.armed = null; render(); }, 4000); break; }
+      S.armed = null; const [kind, did] = key.split(':');
+      if (kind === 'cancel'){ if (await write('POST', `/api/orders/${did}/status`, { status:'cancelled' })) toast('ההזמנה בוטלה'); }
+      if (kind === 'delcust'){ if (await write('DELETE', '/api/customers/' + did)){ S.selCustomer = null; toast('הלקוח נמחק. ההזמנות שלו נשמרות בהיסטוריה'); } }
+      if (kind === 'delmenu'){ if (await write('DELETE', '/api/menu/' + did)) toast('הפריט הוסר מהתפריט'); }
+      render(); break;
+    }
+    case 'selCust': S.selCustomer = id; render(); break;
+    case 'newCust': openCust(); break;
+    case 'editCust': openCust(id); break;
+    case 'saveCust': saveCust(); break;
+    case 'newMenu': openMenu(null, t.dataset.kind); break;
+    case 'editMenu': openMenu(id); break;
+    case 'saveMenu': saveMenu(); break;
+    case 'range': S.range = t.dataset.r; render(); break;
+    case 'pickCust': { const c = custById(id); S.draft.customerId = id; if (c && c.address && !S.draft.address){ S.draft.address = c.address; const ad = $('#oAddress'); if (ad) ad.value = c.address; } renderCustBox(); break; }
+    case 'clearCust': S.draft.customerId = null; S.draft.newCust = null; renderCustBox(); $('#ocSearch')?.focus(); break;
+    case 'newCustInline': { const q = S.draft.q.trim(); const isPhone = normPhone(q).length >= 3 && normPhone(q).length >= q.replace(/\s/g,'').length - 1;
+      S.draft.newCust = { name: isPhone ? '' : q, phone: isPhone ? q : '' }; renderCustBox(); (isPhone ? $('#ncName') : $('#ncPhone'))?.focus(); break; }
+    case 'addLine': {
+      const kind = t.dataset.kind; const first = menuBy(kind).find(m => m.active !== false);
+      if (!first){ toast(kind === 'pizza' ? 'אין פיצות זמינות בתפריט' : 'אין שתייה או מנות צד בתפריט'); break; }
+      S.draft.items.push({ menuId:first.id, size:'L', qty:1, tops:[] }); renderLines(); break;
+    }
+    case 'rmLine': S.draft.items.splice(+t.closest('.line').dataset.i, 1); renderLines(); break;
+    case 'togTop': { const l = S.draft.items[+t.closest('.line').dataset.i]; const tid = t.dataset.t;
+      l.tops = l.tops.includes(tid) ? l.tops.filter(x => x !== tid) : [...l.tops, tid]; renderLines(); break; }
+    case 'saveOrder': saveOrder(); break;
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'orderSearch'){ S.orderQuery = t.value; render(); }
+  else if (t.id === 'custSearch'){ S.custQuery = t.value; render(); }
+  else if (t.id === 'ocSearch'){ S.draft.q = t.value; renderMatches(); }
+  else if (t.id === 'oFee'){ S.draft.fee = +t.value || 0; updateTotal(); }
+  else if (t.dataset.f === 'qty'){ const l = S.draft.items[+t.closest('.line').dataset.i]; l.qty = Math.max(0, parseInt(t.value) || 0);
+    t.closest('.line').querySelector('.unit').textContent = money(lineUnit(l) * l.qty); updateTotal(); }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.name === 'otype'){ S.draft.type = t.value; $('#addrWrap').hidden = $('#feeWrap').hidden = t.value === 'pickup'; updateTotal(); return; }
+  if (t.dataset.f === 'menuId' || t.dataset.f === 'size'){
+    const l = S.draft.items[+t.closest('.line').dataset.i]; l[t.dataset.f] = t.value;
+    if (t.dataset.f === 'menuId'){ const m = S.menu.find(x => x.id === t.value); if (m && m.kind !== 'pizza') l.tops = []; }
+    renderLines();
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.closest('dialog') && e.target.tagName === 'INPUT' && e.target.type !== 'search'){ e.preventDefault(); }
+});
+document.querySelectorAll('form').forEach(f => f.addEventListener('submit', e => e.preventDefault()));
+setInterval(() => { if (S.view === 'orders' && !document.querySelector('dialog[open]') && document.activeElement?.id !== 'orderSearch') render(); }, 60000);
+
+boot();
+</script>
+</body>
+</html>
